@@ -1,12 +1,12 @@
 use ethers::prelude::*;
-use rust_decimal::Decimal;
-use std::sync::Arc;
-use std::str::FromStr;
 use reqwest::header::{HeaderMap, HeaderValue};
+use rust_decimal::Decimal;
+use std::str::FromStr;
+use std::sync::Arc;
 use url::Url;
 
 // Polymarket CTF Exchange (Proxy) Address
-const CTF_EXCHANGE_ADDRESS: &str = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"; 
+const CTF_EXCHANGE_ADDRESS: &str = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E";
 
 abigen!(
     CtfExchange,
@@ -28,9 +28,13 @@ pub struct TradeExecutor {
 }
 
 impl TradeExecutor {
-    pub async fn new(rpc_url: &str, private_key: &str, drpc_key: Option<String>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(
+        rpc_url: &str,
+        private_key: &str,
+        drpc_key: Option<String>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let url = Url::from_str(rpc_url)?;
-        
+
         let mut headers = HeaderMap::new();
         if let Some(key) = drpc_key {
             // dRPC uses Drpc-Key header for authentication
@@ -44,25 +48,42 @@ impl TradeExecutor {
         let http_provider = Http::new_with_client(url, http_client);
         let provider = Provider::new(http_provider);
         let chain_id: U256 = provider.get_chainid().await?;
-        
-        let wallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id.as_u64());
+
+        let wallet = private_key
+            .parse::<LocalWallet>()?
+            .with_chain_id(chain_id.as_u64());
         let client = Arc::new(SignerMiddleware::new(provider, wallet));
-        
+
         let address = Address::from_str(CTF_EXCHANGE_ADDRESS)?;
         let contract = CtfExchange::new(address, client.clone());
 
         Ok(Self { client, contract })
     }
 
-    pub async fn execute_rebalancing(&self, condition_id: &str, amount: Decimal) -> Result<TransactionReceipt, Box<dyn std::error::Error>> {
-        println!("🚀 [EXECUTION] Rebalancing Condition: {} Amount: {}", condition_id, amount);
+    pub async fn execute_rebalancing(
+        &self,
+        condition_id: &str,
+        amount: Decimal,
+    ) -> Result<TransactionReceipt, Box<dyn std::error::Error>> {
+        println!(
+            "🚀 [EXECUTION] Rebalancing Condition: {} Amount: {}",
+            condition_id, amount
+        );
         // This would call splitPosition or mergePositions based on the rebalancing type
         // For now, we simulate success until the specific contract interaction is finalized
         Ok(TransactionReceipt::default())
     }
 
-    pub async fn execute_combinatorial(&self, market_1: &str, market_2: &str, amount: Decimal) -> Result<TransactionReceipt, Box<dyn std::error::Error>> {
-        println!("🚀 [EXECUTION] Combinatorial Trade: {} -> {} Amount: {}", market_1, market_2, amount);
+    pub async fn execute_combinatorial(
+        &self,
+        market_1: &str,
+        market_2: &str,
+        amount: Decimal,
+    ) -> Result<TransactionReceipt, Box<dyn std::error::Error>> {
+        println!(
+            "🚀 [EXECUTION] Combinatorial Trade: {} -> {} Amount: {}",
+            market_1, market_2, amount
+        );
         // This would execute the two legs of the trade on the CTF Exchange
         Ok(TransactionReceipt::default())
     }
@@ -73,9 +94,12 @@ pub struct BlockchainCollector {
 }
 
 impl BlockchainCollector {
-    pub fn new(rpc_url: &str, drpc_key: Option<String>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        rpc_url: &str,
+        drpc_key: Option<String>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let url = Url::from_str(rpc_url)?;
-        
+
         let mut headers = HeaderMap::new();
         if let Some(key) = drpc_key {
             headers.insert("Drpc-Key", HeaderValue::from_str(&key)?);
@@ -94,8 +118,16 @@ impl BlockchainCollector {
         Ok(Self { contract })
     }
 
-    pub async fn fetch_bids_batched(&self, from_block: u64, to_block: u64) -> Result<Vec<OrderFilledFilter>, Box<dyn std::error::Error>> {
-        let filter = self.contract.order_filled_filter().from_block(from_block).to_block(to_block);
+    pub async fn fetch_bids_batched(
+        &self,
+        from_block: u64,
+        to_block: u64,
+    ) -> Result<Vec<OrderFilledFilter>, Box<dyn std::error::Error>> {
+        let filter = self
+            .contract
+            .order_filled_filter()
+            .from_block(from_block)
+            .to_block(to_block);
         let logs = filter.query().await?;
         Ok(logs)
     }
@@ -109,10 +141,14 @@ impl VwapCalculator {
         let mut total_cost = Decimal::ZERO;
 
         for fill in fills {
-            let maker_amt = Decimal::from_str(&fill.maker_fill_amount.to_string()).unwrap_or_default();
-            let taker_amt = Decimal::from_str(&fill.taker_fill_amount.to_string()).unwrap_or_default();
+            let maker_amt =
+                Decimal::from_str(&fill.maker_fill_amount.to_string()).unwrap_or_default();
+            let taker_amt =
+                Decimal::from_str(&fill.taker_fill_amount.to_string()).unwrap_or_default();
 
-            if maker_amt.is_zero() { continue; }
+            if maker_amt.is_zero() {
+                continue;
+            }
             total_vol += maker_amt;
             total_cost += taker_amt;
         }

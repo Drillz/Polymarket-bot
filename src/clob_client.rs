@@ -1,9 +1,9 @@
 use futures::{SinkExt, StreamExt};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use tokio::time::{sleep, Duration};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use url::Url;
-use rust_decimal::Decimal;
-use tokio::time::{sleep, Duration};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubscriptionMessage {
@@ -29,7 +29,11 @@ impl ClobClient {
         }
     }
 
-    pub async fn stream_prices<F, Fut>(&self, asset_ids: Vec<String>, callback: F) -> Result<(), Box<dyn std::error::Error>> 
+    pub async fn stream_prices<F, Fut>(
+        &self,
+        asset_ids: Vec<String>,
+        callback: F,
+    ) -> Result<(), Box<dyn std::error::Error>>
     where
         F: Fn(PriceUpdate) -> Fut,
         Fut: std::future::Future<Output = ()>,
@@ -50,7 +54,10 @@ impl ClobClient {
             sleep(Duration::from_millis(100)).await;
         }
 
-        println!("All {} assets subscribed. Entering live stream.", asset_ids.len());
+        println!(
+            "All {} assets subscribed. Entering live stream.",
+            asset_ids.len()
+        );
 
         loop {
             tokio::select! {
@@ -78,8 +85,17 @@ impl ClobClient {
         }
     }
 
-    pub async fn place_order(&self, asset_id: &str, price: Decimal, size: Decimal, side: &str) -> Result<(), Box<dyn std::error::Error>> {
-        println!("[CLOB] Placing {} order for {} at {} (Size: {})", side, asset_id, price, size);
+    pub async fn place_order(
+        &self,
+        asset_id: &str,
+        price: Decimal,
+        size: Decimal,
+        side: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!(
+            "[CLOB] Placing {} order for {} at {} (Size: {})",
+            side, asset_id, price, size
+        );
         Ok(())
     }
 }
