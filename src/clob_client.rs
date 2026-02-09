@@ -4,6 +4,7 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use url::Url;
 use rust_decimal::Decimal;
 use tokio::time::{sleep, Duration};
+use std::env;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubscriptionMessage {
@@ -24,8 +25,9 @@ pub struct ClobClient {
 
 impl ClobClient {
     pub fn new() -> Self {
+        let ws_url = env::var("CLOB_WS_URL").unwrap_or_else(|_| "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string());
         Self {
-            ws_url: "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string(),
+            ws_url,
         }
     }
 

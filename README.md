@@ -57,6 +57,11 @@ The bot operates in several distinct phases:
     POLY_API_KEY=your_poly_api_key
     POLY_API_SECRET=your_poly_api_secret
     POLY_PASSPHRASE=your_poly_passphrase
+
+    # Polymarket Service URLs (Optional, defaults provided)
+    # CTF_EXCHANGE_ADDRESS=0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E
+    # CLOB_WS_URL=wss://ws-subscriptions-clob.polymarket.com/ws/market
+    # POLY_MARKET_API_URL=https://gamma-api.polymarket.com/events?closed=false&limit=50
     ```
 
 3.  **Build the Project**
