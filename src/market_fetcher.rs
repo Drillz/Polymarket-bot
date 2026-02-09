@@ -2,6 +2,7 @@ use serde::Deserialize;
 use crate::shared_types::{Market, Condition};
 use rust_decimal::Decimal;
 use chrono::NaiveDate;
+use std::env;
 
 #[derive(Deserialize, Debug)]
 struct ApiEvent {
@@ -33,9 +34,10 @@ struct ApiMarket {
 
 pub async fn fetch_markets() -> Result<Vec<Market>, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
+    let api_url = env::var("POLY_MARKET_API_URL").unwrap_or_else(|_| "https://gamma-api.polymarket.com/events?closed=false&limit=50".to_string());
     // Fetching open events with a limit to avoid too much data initially
     // Using a user-agent is often good practice
-    let events: Vec<ApiEvent> = client.get("https://gamma-api.polymarket.com/events?closed=false&limit=50")
+    let events: Vec<ApiEvent> = client.get(&api_url)
         .header("User-Agent", "PolymarketArbitrageBot/1.0")
         .send()
         .await?

@@ -2,11 +2,12 @@ use ethers::prelude::*;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use std::str::FromStr;
+use std::env;
 use reqwest::header::{HeaderMap, HeaderValue};
 use url::Url;
 
-// Polymarket CTF Exchange (Proxy) Address
-const CTF_EXCHANGE_ADDRESS: &str = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"; 
+// Polymarket CTF Exchange (Proxy) Address (Default: Mainnet)
+const DEFAULT_CTF_EXCHANGE_ADDRESS: &str = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E";
 
 abigen!(
     CtfExchange,
@@ -48,7 +49,8 @@ impl TradeExecutor {
         let wallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id.as_u64());
         let client = Arc::new(SignerMiddleware::new(provider, wallet));
         
-        let address = Address::from_str(CTF_EXCHANGE_ADDRESS)?;
+        let address_str = env::var("CTF_EXCHANGE_ADDRESS").unwrap_or_else(|_| DEFAULT_CTF_EXCHANGE_ADDRESS.to_string());
+        let address = Address::from_str(&address_str)?;
         let contract = CtfExchange::new(address, client.clone());
 
         Ok(Self { client, contract })
@@ -88,7 +90,8 @@ impl BlockchainCollector {
         let http_provider = Http::new_with_client(url, http_client);
         let provider = Provider::new(http_provider);
         let client = Arc::new(provider);
-        let address = Address::from_str(CTF_EXCHANGE_ADDRESS)?;
+        let address_str = env::var("CTF_EXCHANGE_ADDRESS").unwrap_or_else(|_| DEFAULT_CTF_EXCHANGE_ADDRESS.to_string());
+        let address = Address::from_str(&address_str)?;
         let contract = CtfExchange::new(address, client.clone());
 
         Ok(Self { contract })
