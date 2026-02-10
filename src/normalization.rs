@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use super::shared_types::Market;
+use super::shared_types::{Market, Entity};
 
 /// Normalizes market data, including timestamp alignment and string sanitization.
 pub fn normalize_markets(markets: &mut Vec<Market>) {
@@ -27,6 +27,7 @@ pub fn normalize_markets(markets: &mut Vec<Market>) {
         for condition in &mut market.conditions {
             condition.name = sanitize_string(&condition.name);
         }
+        market.entities = extract_entities(&market.title);
     }
 }
 
@@ -48,6 +49,25 @@ fn sanitize_string(s: &str) -> String {
     words.join("_")
 }
 
+pub fn extract_entities(title: &str) -> HashSet<Entity> {
+    let mut entities = HashSet::new();
+    let keywords = [
+        "trump", "biden", "harris", "walz", "vance",
+        "bitcoin", "eth", "solana", "fed", "inflation",
+        "lakers", "warriors", "celtics", "knicks",
+        "iran", "israel", "ukraine", "russia"
+    ];
+
+    // Split by underscores (as normalized) and remove punctuation
+    for word in title.split('_') {
+        let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        if keywords.contains(&clean_word) {
+            entities.insert(Entity::Candidate(clean_word.to_string()));
+        }
+    }
+    entities
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,5 +77,13 @@ mod tests {
         assert_eq!(sanitize_string("Will Donald Trump win?"), "donald_trump_win");
         assert_eq!(sanitize_string("The outcome of the election is..."), "election");
         assert_eq!(sanitize_string("NBA: Lakers vs Warriors"), "nba_lakers_vs_warriors");
+    }
+
+    #[test]
+    fn test_extract_entities() {
+        let title = "donald_trump_win_presidential_election";
+        let entities = extract_entities(title);
+        assert!(entities.contains(&Entity::Candidate("trump".to_string())));
+        assert!(!entities.contains(&Entity::Candidate("biden".to_string())));
     }
 }
