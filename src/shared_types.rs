@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct Market {
@@ -10,6 +10,7 @@ pub struct Market {
     pub conditions: Vec<Condition>,
     pub neg_risk_market_id: Option<String>,
     pub tags: Vec<String>,
+    pub entities: HashSet<Entity>,
 }
 
 #[derive(Debug, Clone)]

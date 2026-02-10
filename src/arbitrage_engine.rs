@@ -20,8 +20,8 @@ trait DependencyPattern {
 struct WinnerMarginPattern;
 impl DependencyPattern for WinnerMarginPattern {
     fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, shared_entities: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
+        let t1 = &m1.title;
+        let t2 = &m2.title;
         
         let is_winner_m = t1.contains("win") || t1.contains("winner") || t1.contains("victory");
         let is_margin_m = t2.contains("margin") || t2.contains("points") || t2.contains("by");
@@ -29,9 +29,9 @@ impl DependencyPattern for WinnerMarginPattern {
         if (is_winner_m && is_margin_m) || (is_margin_m && is_winner_m) {
             for entity in shared_entities {
                 if let Entity::Candidate(name) = entity {
-                    let name_lower = name.to_lowercase();
-                    let m1_rel = t1.contains(&name_lower) || c1.name.to_lowercase().contains(&name_lower);
-                    let m2_rel = t2.contains(&name_lower) || c2.name.to_lowercase().contains(&name_lower);
+                    // name is already lowercase, t1/c1 are already normalized/lowercase
+                    let m1_rel = t1.contains(name) || c1.name.contains(name);
+                    let m2_rel = t2.contains(name) || c2.name.contains(name);
                     
                     if m1_rel && m2_rel && c1.outcome == Some(true) && c2.outcome == Some(true) {
                         if is_winner_m && is_margin_m {
@@ -66,13 +66,13 @@ impl DependencyPattern for SubsetImplicationPattern {
 struct StateNationalPattern;
 impl DependencyPattern for StateNationalPattern {
     fn matches(&self, m1: &Market, _c1: &Condition, m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
+        let t1 = &m1.title;
+        let t2 = &m2.title;
         
         let is_state = |t: &str| t.contains("win") && (t.contains("pennsylvania") || t.contains("georgia") || t.contains("arizona"));
         let is_national = |t: &str| t.contains("win") && (t.contains("election") || t.contains("presidency"));
         
-        if is_state(&t1) && is_national(&t2) {
+        if is_state(t1) && is_national(t2) {
              return Some(Dependency { pattern: PatternType::SubsetImplication, direction: Direction::C1ImpliesC2 });
         }
         None
@@ -82,8 +82,8 @@ impl DependencyPattern for StateNationalPattern {
 struct BalanceOfPowerPattern;
 impl DependencyPattern for BalanceOfPowerPattern {
     fn matches(&self, m1: &Market, _c1: &Condition, m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
+        let t1 = &m1.title;
+        let t2 = &m2.title;
         
         let is_pres = t1.contains("presidency") || t1.contains("white house");
         let is_senate = t2.contains("senate");
@@ -129,9 +129,11 @@ fn parse_range(name: &str) -> Option<(Decimal, Decimal)> {
 
 pub fn analyze_dependency(m1: &Market, c1: &Condition, m2: &Market, c2: &Condition) -> Option<Dependency> {
     if m1.id == m2.id { return None; }
-    let entities1 = extract_entities(&m1.title);
-    let entities2 = extract_entities(&m2.title);
-    let shared: HashSet<_> = entities1.intersection(&entities2).cloned().collect();
+
+    // OPTIMIZED: Use pre-computed entities instead of extracting them here
+    // Entities are now populated during normalization
+    let shared: HashSet<_> = m1.entities.intersection(&m2.entities).cloned().collect();
+
     if shared.is_empty() && !m1.title.contains(&m2.title) && !m2.title.contains(&m1.title) {
         return None;
     }
@@ -150,25 +152,6 @@ pub fn analyze_dependency(m1: &Market, c1: &Condition, m2: &Market, c2: &Conditi
         }
     }
     None
-}
-
-fn extract_entities(title: &str) -> HashSet<Entity> {
-    let mut entities = HashSet::new();
-    let keywords = [
-        "trump", "biden", "harris", "walz", "vance", 
-        "bitcoin", "eth", "solana", "fed", "inflation",
-        "lakers", "warriors", "celtics", "knicks",
-        "iran", "israel", "ukraine", "russia"
-    ];
-    
-    // Split by underscores (as normalized) and remove punctuation
-    for word in title.split('_') {
-        let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
-        if keywords.contains(&clean_word) {
-            entities.insert(Entity::Candidate(clean_word.to_string()));
-        }
-    }
-    entities
 }
 
 pub fn find_combinatorial_opportunities(
@@ -245,6 +228,7 @@ pub fn are_markets_related(m1: &Market, m2: &Market) -> bool {
 mod tests {
     use super::*;
     use crate::shared_types::{Market, Condition};
+    use crate::normalization::extract_entities; // Import extract_entities for tests
     use rust_decimal_macros::dec;
     use chrono::NaiveDate;
 
@@ -260,6 +244,7 @@ mod tests {
             ],
             neg_risk_market_id: None,
             tags: vec![],
+            entities: HashSet::new(),
         };
         
         let opp = check_rebalancing(&market).unwrap();
@@ -276,6 +261,7 @@ mod tests {
             conditions: vec![Condition { name: "5-10%".to_string(), price: dec!(0.6), outcome: Some(true), asset_id: "1".to_string() }],
             neg_risk_market_id: None,
             tags: vec![],
+            entities: HashSet::new(),
         };
         let m2 = Market {
             id: "m2".to_string(),
@@ -284,56 +270,39 @@ mod tests {
             conditions: vec![Condition { name: "0-20%".to_string(), price: dec!(0.5), outcome: Some(true), asset_id: "2".to_string() }],
             neg_risk_market_id: None,
             tags: vec![],
+            entities: HashSet::new(),
         };
         
         let dep = analyze_dependency(&m1, &m1.conditions[0], &m2, &m2.conditions[0]).unwrap();
         assert_eq!(dep.direction, Direction::C1ImpliesC2);
     }
 
-        #[test]
+    #[test]
+    fn test_winner_margin_implication() {
+        let title1 = "trump_win_presidential_election";
+        let title2 = "trump_margin_victory";
 
-        fn test_winner_margin_implication() {
+        let m1 = Market {
+            id: "m1".to_string(),
+            title: title1.to_string(),
+            end_date: NaiveDate::from_ymd_opt(2024, 11, 5).unwrap(),
+            conditions: vec![Condition { name: "Donald Trump".to_string(), price: dec!(0.5), outcome: Some(true), asset_id: "1".to_string() }],
+            neg_risk_market_id: None,
+            tags: vec![],
+            entities: extract_entities(title1),
+        };
 
-            let m1 = Market {
+        let m2 = Market {
+            id: "m2".to_string(),
+            title: title2.to_string(),
+            end_date: NaiveDate::from_ymd_opt(2024, 11, 5).unwrap(),
+            conditions: vec![Condition { name: "5-10%".to_string(), price: dec!(0.6), outcome: Some(true), asset_id: "2".to_string() }],
+            neg_risk_market_id: None,
+            tags: vec![],
+            entities: extract_entities(title2),
+        };
 
-                id: "m1".to_string(),
-
-                title: "trump_win_presidential_election".to_string(),
-
-                end_date: NaiveDate::from_ymd_opt(2024, 11, 5).unwrap(),
-
-                conditions: vec![Condition { name: "Donald Trump".to_string(), price: dec!(0.5), outcome: Some(true), asset_id: "1".to_string() }],
-
-                neg_risk_market_id: None,
-
-                tags: vec![],
-
-            };
-
-            let m2 = Market {
-
-                id: "m2".to_string(),
-
-                title: "trump_margin_victory".to_string(),
-
-                end_date: NaiveDate::from_ymd_opt(2024, 11, 5).unwrap(),
-
-                conditions: vec![Condition { name: "5-10%".to_string(), price: dec!(0.6), outcome: Some(true), asset_id: "2".to_string() }],
-
-                neg_risk_market_id: None,
-
-                tags: vec![],
-
-            };
-
-            
-
-            let dep = analyze_dependency(&m1, &m1.conditions[0], &m2, &m2.conditions[0]).unwrap();
-
-            assert_eq!(dep.direction, Direction::C2ImpliesC1);
-
-        }
-
+        let dep = analyze_dependency(&m1, &m1.conditions[0], &m2, &m2.conditions[0]).unwrap();
+        assert_eq!(dep.direction, Direction::C2ImpliesC1);
     }
-
-    
+}

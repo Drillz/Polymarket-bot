@@ -3,6 +3,7 @@ use crate::shared_types::{Market, Condition};
 use rust_decimal::Decimal;
 use chrono::NaiveDate;
 use std::env;
+use std::collections::HashSet;
 
 #[derive(Deserialize, Debug)]
 struct ApiEvent {
@@ -100,6 +101,7 @@ pub async fn fetch_markets() -> Result<Vec<Market>, Box<dyn std::error::Error>> 
                 conditions,
                 neg_risk_market_id: api_market.neg_risk_market_id,
                 tags: tags.clone(),
+                entities: HashSet::new(),
             });
         }
     }
