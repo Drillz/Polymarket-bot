@@ -14,24 +14,21 @@ lazy_static! {
 
 /// Trait for different dependency patterns as per the design summary
 trait DependencyPattern {
-    fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, shared_entities: &HashSet<Entity>) -> Option<Dependency>;
+    fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, shared_entities: &HashSet<Entity>, t1_lower: &str, t2_lower: &str) -> Option<Dependency>;
 }
 
 struct WinnerMarginPattern;
 impl DependencyPattern for WinnerMarginPattern {
-    fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, shared_entities: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
-        
-        let is_winner_m = t1.contains("win") || t1.contains("winner") || t1.contains("victory");
-        let is_margin_m = t2.contains("margin") || t2.contains("points") || t2.contains("by");
+    fn matches(&self, _m1: &Market, c1: &Condition, _m2: &Market, c2: &Condition, shared_entities: &HashSet<Entity>, t1_lower: &str, t2_lower: &str) -> Option<Dependency> {
+        let is_winner_m = t1_lower.contains("win") || t1_lower.contains("winner") || t1_lower.contains("victory");
+        let is_margin_m = t2_lower.contains("margin") || t2_lower.contains("points") || t2_lower.contains("by");
 
         if (is_winner_m && is_margin_m) || (is_margin_m && is_winner_m) {
             for entity in shared_entities {
                 if let Entity::Candidate(name) = entity {
                     let name_lower = name.to_lowercase();
-                    let m1_rel = t1.contains(&name_lower) || c1.name.to_lowercase().contains(&name_lower);
-                    let m2_rel = t2.contains(&name_lower) || c2.name.to_lowercase().contains(&name_lower);
+                    let m1_rel = t1_lower.contains(&name_lower) || c1.name.to_lowercase().contains(&name_lower);
+                    let m2_rel = t2_lower.contains(&name_lower) || c2.name.to_lowercase().contains(&name_lower);
                     
                     if m1_rel && m2_rel && c1.outcome == Some(true) && c2.outcome == Some(true) {
                         if is_winner_m && is_margin_m {
@@ -49,7 +46,11 @@ impl DependencyPattern for WinnerMarginPattern {
 
 struct SubsetImplicationPattern;
 impl DependencyPattern for SubsetImplicationPattern {
-    fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
+    fn matches(&self, m1: &Market, c1: &Condition, m2: &Market, c2: &Condition, _shared: &HashSet<Entity>, _t1_lower: &str, _t2_lower: &str) -> Option<Dependency> {
+        // Keeping original logic which used m1.title (case-sensitive?)
+        // The original code was:
+        // if m2.title.contains(&m1.title) && m1.title != m2.title
+        // I will preserve that behavior.
         if m2.title.contains(&m1.title) && m1.title != m2.title {
             if c1.outcome == c2.outcome && c1.outcome == Some(true) {
                 return Some(Dependency { pattern: PatternType::SubsetImplication, direction: Direction::C2ImpliesC1 });
@@ -65,14 +66,11 @@ impl DependencyPattern for SubsetImplicationPattern {
 
 struct StateNationalPattern;
 impl DependencyPattern for StateNationalPattern {
-    fn matches(&self, m1: &Market, _c1: &Condition, m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
-        
+    fn matches(&self, _m1: &Market, _c1: &Condition, _m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>, t1_lower: &str, t2_lower: &str) -> Option<Dependency> {
         let is_state = |t: &str| t.contains("win") && (t.contains("pennsylvania") || t.contains("georgia") || t.contains("arizona"));
         let is_national = |t: &str| t.contains("win") && (t.contains("election") || t.contains("presidency"));
         
-        if is_state(&t1) && is_national(&t2) {
+        if is_state(t1_lower) && is_national(t2_lower) {
              return Some(Dependency { pattern: PatternType::SubsetImplication, direction: Direction::C1ImpliesC2 });
         }
         None
@@ -81,12 +79,9 @@ impl DependencyPattern for StateNationalPattern {
 
 struct BalanceOfPowerPattern;
 impl DependencyPattern for BalanceOfPowerPattern {
-    fn matches(&self, m1: &Market, _c1: &Condition, m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
-        let t1 = m1.title.to_lowercase();
-        let t2 = m2.title.to_lowercase();
-        
-        let is_pres = t1.contains("presidency") || t1.contains("white house");
-        let is_senate = t2.contains("senate");
+    fn matches(&self, _m1: &Market, _c1: &Condition, _m2: &Market, _c2: &Condition, _shared: &HashSet<Entity>, t1_lower: &str, t2_lower: &str) -> Option<Dependency> {
+        let is_pres = t1_lower.contains("presidency") || t1_lower.contains("white house");
+        let is_senate = t2_lower.contains("senate");
         
         if is_pres && is_senate {
              return Some(Dependency { pattern: PatternType::SubsetImplication, direction: Direction::C1ImpliesC2 });
@@ -97,7 +92,7 @@ impl DependencyPattern for BalanceOfPowerPattern {
 
 struct NumericRangePattern;
 impl DependencyPattern for NumericRangePattern {
-    fn matches(&self, _m1: &Market, c1: &Condition, _m2: &Market, c2: &Condition, _shared: &HashSet<Entity>) -> Option<Dependency> {
+    fn matches(&self, _m1: &Market, c1: &Condition, _m2: &Market, c2: &Condition, _shared: &HashSet<Entity>, _t1_lower: &str, _t2_lower: &str) -> Option<Dependency> {
         let r1 = parse_range(&c1.name)?;
         let r2 = parse_range(&c2.name)?;
 
@@ -127,15 +122,12 @@ fn parse_range(name: &str) -> Option<(Decimal, Decimal)> {
     None
 }
 
-pub fn analyze_dependency(m1: &Market, c1: &Condition, m2: &Market, c2: &Condition) -> Option<Dependency> {
-    if m1.id == m2.id { return None; }
-    let entities1 = extract_entities(&m1.title);
-    let entities2 = extract_entities(&m2.title);
-    let shared: HashSet<_> = entities1.intersection(&entities2).cloned().collect();
-    if shared.is_empty() && !m1.title.contains(&m2.title) && !m2.title.contains(&m1.title) {
-        return None;
-    }
-
+fn analyze_dependency_inner(
+    m1: &Market, c1: &Condition,
+    m2: &Market, c2: &Condition,
+    shared: &HashSet<Entity>,
+    t1_lower: &str, t2_lower: &str
+) -> Option<Dependency> {
     let patterns: Vec<Box<dyn DependencyPattern>> = vec![
         Box::new(WinnerMarginPattern),
         Box::new(SubsetImplicationPattern),
@@ -145,11 +137,26 @@ pub fn analyze_dependency(m1: &Market, c1: &Condition, m2: &Market, c2: &Conditi
     ];
 
     for pattern in patterns {
-        if let Some(dep) = pattern.matches(m1, c1, m2, c2, &shared) {
+        if let Some(dep) = pattern.matches(m1, c1, m2, c2, shared, t1_lower, t2_lower) {
             return Some(dep);
         }
     }
     None
+}
+
+pub fn analyze_dependency(m1: &Market, c1: &Condition, m2: &Market, c2: &Condition) -> Option<Dependency> {
+    if m1.id == m2.id { return None; }
+    let entities1 = extract_entities(&m1.title);
+    let entities2 = extract_entities(&m2.title);
+    let shared: HashSet<_> = entities1.intersection(&entities2).cloned().collect();
+    if shared.is_empty() && !m1.title.contains(&m2.title) && !m2.title.contains(&m1.title) {
+        return None;
+    }
+
+    let t1_lower = m1.title.to_lowercase();
+    let t2_lower = m2.title.to_lowercase();
+
+    analyze_dependency_inner(m1, c1, m2, c2, &shared, &t1_lower, &t2_lower)
 }
 
 fn extract_entities(title: &str) -> HashSet<Entity> {
@@ -189,9 +196,22 @@ pub fn find_combinatorial_opportunities(
 /// Efficiently checks just two markets for combinatorial arbitrage
 pub fn check_combinatorial_pair(m1: &Market, m2: &Market) -> Vec<CombinatorialOpportunity> {
     let mut opportunities = Vec::new();
+
+    // Optimization: Pre-compute shared entities and lowercased titles
+    let t1_lower = m1.title.to_lowercase();
+    let t2_lower = m2.title.to_lowercase();
+    let entities1 = extract_entities(&m1.title);
+    let entities2 = extract_entities(&m2.title);
+    let shared: HashSet<_> = entities1.intersection(&entities2).cloned().collect();
+
+    // Early exit check
+    if shared.is_empty() && !m1.title.contains(&m2.title) && !m2.title.contains(&m1.title) {
+         return Vec::new();
+    }
+
     for c1 in &m1.conditions {
         for c2 in &m2.conditions {
-            if let Some(dep) = analyze_dependency(m1, c1, m2, c2) {
+            if let Some(dep) = analyze_dependency_inner(m1, c1, m2, c2, &shared, &t1_lower, &t2_lower) {
                 let (implying_c, implied_c) = match dep.direction {
                     Direction::C1ImpliesC2 => (c1, c2),
                     Direction::C2ImpliesC1 => (c2, c1),
@@ -335,5 +355,3 @@ mod tests {
         }
 
     }
-
-    
