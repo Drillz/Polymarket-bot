@@ -21,7 +21,10 @@ impl ExecutionAnalyzer {
 
         // Group by user
         for exec in executions {
-            user_activity.entry(exec.user_address.clone()).or_insert_with(Vec::new).push(exec);
+            user_activity
+                .entry(exec.user_address.clone())
+                .or_default()
+                .push(exec);
         }
 
         // Analyze each user's patterns
@@ -37,7 +40,9 @@ impl ExecutionAnalyzer {
     /// Heuristic to detect if a set of transactions looks like arbitrage
     /// e.g., Buying YES and NO in the same market within a short window
     fn is_arbitrage_pattern(txs: Vec<&UserExecution>) -> bool {
-        if txs.len() < 2 { return false; }
+        if txs.len() < 2 {
+            return false;
+        }
 
         let mut market_counts: HashMap<String, usize> = HashMap::new();
         for tx in &txs {
@@ -52,7 +57,7 @@ impl ExecutionAnalyzer {
                 return true;
             }
         }
-        
+
         false
     }
 }

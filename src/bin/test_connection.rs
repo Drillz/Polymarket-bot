@@ -1,7 +1,7 @@
-use ethers::prelude::*;
 use dotenv::dotenv;
-use std::env;
+use ethers::prelude::*;
 use reqwest::header::{HeaderMap, HeaderValue};
+use std::env;
 use url::Url;
 
 #[tokio::main]
@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let drpc_key = env::var("DRPC_API_KEY").ok();
 
     println!("Connecting to dRPC...");
-    
+
     let mut headers = HeaderMap::new();
     if let Some(key) = drpc_key {
         headers.insert("Drpc-Key", HeaderValue::from_str(&key)?);
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = Url::parse(&rpc_url_str)?;
     let provider = Provider::new(Http::new_with_client(url, http_client));
-    
+
     let block_number = provider.get_block_number().await?;
     println!("✅ Connection Successful. Current Block: {}", block_number);
 
