@@ -1,7 +1,7 @@
-use serde::Deserialize;
-use crate::shared_types::{Market, Condition};
-use rust_decimal::Decimal;
+use crate::shared_types::{Condition, Market};
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
+use serde::Deserialize;
 use std::env;
 
 #[derive(Deserialize, Debug)]
@@ -34,10 +34,13 @@ struct ApiMarket {
 
 pub async fn fetch_markets() -> Result<Vec<Market>, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let api_url = env::var("POLY_MARKET_API_URL").unwrap_or_else(|_| "https://gamma-api.polymarket.com/events?closed=false&limit=50".to_string());
+    let api_url = env::var("POLY_MARKET_API_URL").unwrap_or_else(|_| {
+        "https://gamma-api.polymarket.com/events?closed=false&limit=50".to_string()
+    });
     // Fetching open events with a limit to avoid too much data initially
     // Using a user-agent is often good practice
-    let events: Vec<ApiEvent> = client.get(&api_url)
+    let events: Vec<ApiEvent> = client
+        .get(&api_url)
         .header("User-Agent", "PolymarketArbitrageBot/1.0")
         .send()
         .await?
@@ -55,21 +58,25 @@ pub async fn fetch_markets() -> Result<Vec<Market>, Box<dyn std::error::Error>> 
             },
             None => continue,
         };
-        
+
         let tags: Vec<String> = event.tags.into_iter().map(|t| t.label).collect();
 
         for api_market in event.markets {
             let outcomes_str = api_market.outcomes.unwrap_or_else(|| "[]".to_string());
-            let prices_str = api_market.outcome_prices.unwrap_or_else(|| "[]".to_string());
-            let token_ids_str = api_market.clob_token_ids.unwrap_or_else(|| "[]".to_string());
-            
+            let prices_str = api_market
+                .outcome_prices
+                .unwrap_or_else(|| "[]".to_string());
+            let token_ids_str = api_market
+                .clob_token_ids
+                .unwrap_or_else(|| "[]".to_string());
+
             // Need to parse these JSON strings manually as they are often stringified JSON in the API
             let outcomes: Vec<String> = serde_json::from_str(&outcomes_str).unwrap_or_default();
             let prices: Vec<String> = serde_json::from_str(&prices_str).unwrap_or_default();
             let token_ids: Vec<String> = serde_json::from_str(&token_ids_str).unwrap_or_default();
 
             if outcomes.len() != prices.len() || outcomes.len() != token_ids.len() {
-                continue; 
+                continue;
             }
 
             let mut conditions = Vec::new();

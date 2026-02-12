@@ -1,10 +1,10 @@
 use futures::{SinkExt, StreamExt};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::env;
+use tokio::time::{sleep, Duration};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use url::Url;
-use rust_decimal::Decimal;
-use tokio::time::{sleep, Duration};
-use std::env;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubscriptionMessage {
@@ -23,15 +23,24 @@ pub struct ClobClient {
     pub ws_url: String,
 }
 
+impl Default for ClobClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClobClient {
     pub fn new() -> Self {
-        let ws_url = env::var("CLOB_WS_URL").unwrap_or_else(|_| "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string());
-        Self {
-            ws_url,
-        }
+        let ws_url = env::var("CLOB_WS_URL")
+            .unwrap_or_else(|_| "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string());
+        Self { ws_url }
     }
 
-    pub async fn stream_prices<F, Fut>(&self, asset_ids: Vec<String>, callback: F) -> Result<(), Box<dyn std::error::Error>> 
+    pub async fn stream_prices<F, Fut>(
+        &self,
+        asset_ids: Vec<String>,
+        callback: F,
+    ) -> Result<(), Box<dyn std::error::Error>>
     where
         F: Fn(PriceUpdate) -> Fut,
         Fut: std::future::Future<Output = ()>,
@@ -52,7 +61,10 @@ impl ClobClient {
             sleep(Duration::from_millis(100)).await;
         }
 
-        println!("All {} assets subscribed. Entering live stream.", asset_ids.len());
+        println!(
+            "All {} assets subscribed. Entering live stream.",
+            asset_ids.len()
+        );
 
         loop {
             tokio::select! {
@@ -80,8 +92,17 @@ impl ClobClient {
         }
     }
 
-    pub async fn place_order(&self, asset_id: &str, price: Decimal, size: Decimal, side: &str) -> Result<(), Box<dyn std::error::Error>> {
-        println!("[CLOB] Placing {} order for {} at {} (Size: {})", side, asset_id, price, size);
+    pub async fn place_order(
+        &self,
+        asset_id: &str,
+        price: Decimal,
+        size: Decimal,
+        side: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!(
+            "[CLOB] Placing {} order for {} at {} (Size: {})",
+            side, asset_id, price, size
+        );
         Ok(())
     }
 }
